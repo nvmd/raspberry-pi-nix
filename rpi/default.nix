@@ -4,7 +4,11 @@
 let cfg = config.raspberry-pi-nix;
 in
 {
-  imports = [ ../sd-image ./config.nix ./i2c.nix ];
+  imports = [
+    # ../sd-image
+    ./config.nix
+    ./i2c.nix
+  ];
 
   options = with lib; {
     raspberry-pi-nix = {
@@ -43,6 +47,22 @@ in
           '';
         };
       };
+      firmwarePartitionID = mkOption {
+        type = types.str;
+        default = "0x2178694e";
+        description = ''
+          Volume ID for the /boot/firmware partition on the SD card. This value
+          must be a 32-bit hexadecimal number.
+        '';
+      };
+
+      firmwarePartitionName = mkOption {
+        type = types.str;
+        default = "FIRMWARE";
+        description = ''
+          Name of the filesystem which holds the boot firmware.
+        '';
+      };
     };
   };
 
@@ -54,7 +74,7 @@ in
         # table, so the partition table id is a 1-indexed hex
         # number. So, we drop the hex prefix and stick on a "02" to
         # refer to the root partition.
-        "root=PARTUUID=${lib.strings.removePrefix "0x" config.sdImage.firmwarePartitionID}-02"
+        "root=PARTUUID=${lib.strings.removePrefix "0x" config.raspberry-pi-nix.firmwarePartitionID}-02"
         "rootfstype=ext4"
         "fsck.repair=yes"
         "rootwait"
@@ -78,7 +98,7 @@ in
             {
               Type = "oneshot";
               MountImages =
-                "/dev/disk/by-label/${config.sdImage.firmwarePartitionName}:${firmware-path}";
+                "/dev/disk/by-label/${config.raspberry-pi-nix.firmwarePartitionName}:${firmware-path}";
               StateDirectory = "raspberrypi-firmware";
               ExecStart = pkgs.writeShellScript "migrate-rpi-firmware" ''
                 shopt -s nullglob

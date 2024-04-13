@@ -73,22 +73,22 @@ in {
       '';
     };
 
-    firmwarePartitionID = mkOption {
-      type = types.str;
-      default = "0x2178694e";
-      description = ''
-        Volume ID for the /boot/firmware partition on the SD card. This value
-        must be a 32-bit hexadecimal number.
-      '';
-    };
+    # firmwarePartitionID = mkOption {
+    #   type = types.str;
+    #   default = "0x2178694e";
+    #   description = ''
+    #     Volume ID for the /boot/firmware partition on the SD card. This value
+    #     must be a 32-bit hexadecimal number.
+    #   '';
+    # };
 
-    firmwarePartitionName = mkOption {
-      type = types.str;
-      default = "FIRMWARE";
-      description = ''
-        Name of the filesystem which holds the boot firmware.
-      '';
-    };
+    # firmwarePartitionName = mkOption {
+    #   type = types.str;
+    #   default = "FIRMWARE";
+    #   description = ''
+    #     Name of the filesystem which holds the boot firmware.
+    #   '';
+    # };
 
     rootPartitionUUID = mkOption {
       type = types.nullOr types.str;
@@ -160,7 +160,7 @@ in {
   config = {
     fileSystems = {
       "/boot/firmware" = {
-        device = "/dev/disk/by-label/${config.sdImage.firmwarePartitionName}";
+        device = "/dev/disk/by-label/${config.raspberry-pi-nix.firmwarePartitionName}";
         fsType = "vfat";
       };
       "/" = {
@@ -211,7 +211,7 @@ in {
             # information (dtbs, extlinux.conf file).
             sfdisk $img <<EOF
                 label: dos
-                label-id: ${config.sdImage.firmwarePartitionID}
+                label-id: ${config.raspberry-pi-nix.firmwarePartitionID}
 
                 start=''${gap}M, size=$firmwareSizeBlocks, type=b
                 start=$((gap + ${
@@ -226,7 +226,7 @@ in {
             # Create a FAT32 /boot/firmware partition of suitable size into firmware_part.img
             eval $(partx $img -o START,SECTORS --nr 1 --pairs)
             truncate -s $((SECTORS * 512)) firmware_part.img
-            faketime "1970-01-01 00:00:00" mkfs.vfat -i ${config.sdImage.firmwarePartitionID} -n ${config.sdImage.firmwarePartitionName} firmware_part.img
+            faketime "1970-01-01 00:00:00" mkfs.vfat -i ${config.raspberry-pi-nix.firmwarePartitionID} -n ${config.raspberry-pi-nix.firmwarePartitionName} firmware_part.img
 
             # Populate the files intended for /boot/firmware
             mkdir firmware
