@@ -263,12 +263,42 @@ in
         options = {
           # The firmware will start our u-boot binary rather than a
           # linux kernel.
-          kernel = {
+          kernel = lib.mkIf (cfg.uboot.enable || cfg.rpi-bootloader.enable) {
             enable = true;
             value = if cfg.uboot.enable then "u-boot-rpi-arm64.bin"
                     else if cfg.rpi-bootloader.enable then "kernel.img"
-                    else if cfg.uefi.enable then (builtins.throw "uefi not yet supported")
-                    else (builtins.throw "invalid bootloader option");
+                    else (builtins.throw "invalid bootloader option for `kernel`");
+          };
+          armstub = {
+            enable = lib.mkDefault cfg.uefi.enable;
+            value = "RPI_EFI.fd";
+          };
+          device_tree_address = {
+            enable = lib.mkDefault cfg.uefi.enable;
+            value = lib.mkDefault "0x1f0000";
+          };
+          device_tree_end = {
+            enable = lib.mkDefault cfg.uefi.enable;
+            value = lib.mkDefault (if cfg.uefi.variant == 4 then "0x200000"
+                                   else if cfg.uefi.variant == 5 then "0x210000"
+                                   else (builtins.throw "unsupported uefi variant"));
+          };
+          framebuffer_depth = {
+            # Force 32 bpp framebuffer allocation.
+            enable = lib.mkDefault (cfg.uefi.enable && cfg.uefi.variant == 5);
+            value = 32;
+          };
+          disable_commandline_tags = {
+            enable = lib.mkDefault (cfg.uefi.enable && cfg.uefi.variant == 4);
+            value = 1;
+          };
+          uart_2ndstage = {
+            enable = lib.mkDefault (cfg.uefi.enable && cfg.uefi.variant == 4);
+            value = 1;
+          };
+          enable_gic = {
+            enable = lib.mkDefault (cfg.uefi.enable && cfg.uefi.variant == 4);
+            value = 1;
           };
           arm_64bit = {
             enable = true;
@@ -298,6 +328,14 @@ in
         dt-overlays = {
           vc4-kms-v3d = {
             enable = lib.mkDefault true;
+            params = { };
+          };
+          miniuart-bt = {
+            enable = lib.mkDefault (cfg.uefi.enable && cfg.uefi.variant == 4);
+            params = { };
+          };
+          upstream-pi4 = {
+            enable = lib.mkDefault (cfg.uefi.enable && cfg.uefi.variant == 4);
             params = { };
           };
         };
