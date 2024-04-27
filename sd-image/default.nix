@@ -13,35 +13,40 @@
 
     sdImage =
       let
+        cfg = config.raspberry-pi-nix;
+
         kernel-params = pkgs.writeTextFile {
           name = "cmdline.txt";
           text = ''
             ${lib.strings.concatStringsSep " " config.boot.kernelParams}
           '';
         };
-        populate-kernel =
-          if config.raspberry-pi-nix.uboot.enable
-          then ''
-            cp ${pkgs.uboot_rpi_arm64}/u-boot.bin firmware/u-boot-rpi-arm64.bin
-          ''
-          else ''
-            cp "${pkgs.rpi-kernels.latest.kernel}/Image" firmware/kernel.img
-            cp "${kernel-params}" firmware/cmdline.txt
-          '';
+
+        populate-uboot = ''
+          cp ${pkgs.uboot_rpi_arm64}/u-boot.bin firmware/u-boot-rpi-arm64.bin
+        '';
+        populate-kernel = ''
+          cp "${pkgs.rpi-kernels.latest.kernel}/Image" firmware/kernel.img
+          cp "${kernel-params}" firmware/cmdline.txt
+        '';
+
+        populate-bootloader =
+          if cfg.uboot.enable then populate-uboot
+          else if cfg.rpi-bootloader.enable then populate-kernel
+          else (builtins.throw "invalid bootloader option");
       in
       {
         populateFirmwareCommands = ''
-          ${populate-kernel}
+          ${populate-bootloader}
           cp -r ${pkgs.raspberrypifw}/share/raspberrypi/boot/{start*.elf,*.dtb,bootcode.bin,fixup*.dat,overlays} firmware
           cp ${config.hardware.raspberry-pi.config-output} firmware/config.txt
         '';
         populateRootCommands =
-          if config.raspberry-pi-nix.uboot.enable
-          then ''
+          if cfg.uboot.enable then ''
             mkdir -p ./files/boot
             ${config.boot.loader.generic-extlinux-compatible.populateCmd} -c ${config.system.build.toplevel} -d ./files/boot
           ''
-          else ''
+          else if cfg.rpi-bootloader.enable then ''
             mkdir -p ./files/sbin
             content="$(
               echo "#!${pkgs.bash}/bin/bash"
@@ -49,7 +54,8 @@
             )"
             echo "$content" > ./files/sbin/init
             chmod 744 ./files/sbin/init
-          '';
+          ''
+          else (builtins.throw "invalid bootloader option");
       };
   };
 }

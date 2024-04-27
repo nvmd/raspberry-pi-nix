@@ -27,19 +27,27 @@ in
           '';
         };
       };
-      uboot = {
+      rpi-bootloader = {
         enable = mkOption {
-          default = true;
+          default = false;
           type = types.bool;
           description = ''
-            If enabled then uboot is used as the bootloader. If disabled
-            then the linux kernel is installed directly into the
+            The linux kernel is installed directly into the
             firmware directory as expected by the raspberry pi boot
             process.
 
             This can be useful for newer hardware that doesn't yet have
             uboot compatibility or less common setups, like booting a
             cm4 with an nvme drive.
+          '';
+        };
+      };
+      uboot = {
+        enable = mkOption {
+          default = true;
+          type = types.bool;
+          description = ''
+            If enabled then uboot is used as the bootloader.
           '';
         };
       };
@@ -65,7 +73,7 @@ in
   config = {
     boot.kernelParams =
       if cfg.uboot.enable then [ ]
-      else [
+      else if cfg.rpi-bootloader.enable then [
         # This is ugly and fragile, but the sdImage image has an msdos
         # table, so the partition table id is a 1-indexed hex
         # number. So, we drop the hex prefix and stick on a "02" to
@@ -75,7 +83,8 @@ in
         "fsck.repair=yes"
         "rootwait"
         "init=/sbin/init"
-      ];
+      ]
+      else (builtins.throw "invalid bootloader option");
     systemd.services = {
       "raspberry-pi-firmware-migrate" =
         {
@@ -105,6 +114,7 @@ in
                 UBOOT="${pkgs.uboot_rpi_arm64}/u-boot.bin"
                 KERNEL="${pkgs.rpi-kernels.latest.kernel}/Image"
                 SHOULD_UBOOT=${if cfg.uboot.enable then "1" else "0"}
+                SHOULD_RPI_BOOT=${if cfg.rpi-bootloader.enable then "1" else "0"}
                 SRC_FIRMWARE_DIR="${pkgs.raspberrypifw}/share/raspberrypi/boot"
                 STARTFILES=("$SRC_FIRMWARE_DIR"/start*.elf)
                 DTBS=("$SRC_FIRMWARE_DIR"/*.dtb)
@@ -186,13 +196,13 @@ in
                   migrate_uboot
                 fi
 
-                if [[ "$SHOULD_UBOOT" -ne 1 ]] && [[ ! -f "$STATE_DIRECTORY/kernel-version" || $(< "$STATE_DIRECTORY/kernel-version") != ${
+                if [[ "$SHOULD_RPI_BOOT" -eq 1 ]] && [[ ! -f "$STATE_DIRECTORY/kernel-version" || $(< "$STATE_DIRECTORY/kernel-version") != ${
                   builtins.toString pkgs.rpi-kernels.latest.kernel
                 } ]]; then
                   migrate_kernel
                 fi
 
-                if [[ "$SHOULD_UBOOT" -ne 1 ]] && [[ ! -f "$STATE_DIRECTORY/cmdline-version" || $(< "$STATE_DIRECTORY/cmdline-version") != ${
+                if [[ "$SHOULD_RPI_BOOT" -eq 1 ]] && [[ ! -f "$STATE_DIRECTORY/cmdline-version" || $(< "$STATE_DIRECTORY/cmdline-version") != ${
                   builtins.toString kernel-params
                 } ]]; then
                   migrate_cmdline
@@ -239,7 +249,9 @@ in
           # linux kernel.
           kernel = {
             enable = true;
-            value = if cfg.uboot.enable then "u-boot-rpi-arm64.bin" else "kernel.img";
+            value = if cfg.uboot.enable then "u-boot-rpi-arm64.bin"
+                    else if cfg.rpi-bootloader.enable then "kernel.img"
+                    else (builtins.throw "invalid bootloader option");
           };
           arm_64bit = {
             enable = true;
@@ -292,7 +304,7 @@ in
 
       loader = {
         grub.enable = lib.mkDefault false;
-        initScript.enable = !cfg.uboot.enable;
+        initScript.enable = cfg.rpi-bootloader.enable;
         generic-extlinux-compatible = {
           enable = lib.mkDefault cfg.uboot.enable;
           # We want to use the device tree provided by firmware, so don't
