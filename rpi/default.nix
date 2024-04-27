@@ -366,6 +366,13 @@ in
           # add FDTDIR to the extlinux conf file.
           useGenerationDeviceTree = false;
         };
+
+        efi = lib.mkIf cfg.uefi.enable {
+          canTouchEfiVariables = lib.mkDefault false;
+        };
+        systemd-boot = {
+          enable = lib.mkDefault cfg.uefi.enable;
+        };
       };
     };
     hardware.enableRedistributableFirmware = true;
