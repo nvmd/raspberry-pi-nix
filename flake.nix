@@ -8,11 +8,11 @@
     };
     rpi-linux-6_1-src = {
       flake = false;
-      url = "github:raspberrypi/linux/stable_20231123";
+      url = "https://github.com/raspberrypi/linux/archive/refs/tags/stable_20231123.tar.gz?unpack=false";
     };
     rpi-firmware-src = {
       flake = false;
-      url = "github:raspberrypi/firmware/7e6decce72fdff51923e9203db46716835ae889a";
+      url = "https://github.com/raspberrypi/firmware/archive/7e6decce72fdff51923e9203db46716835ae889a.tar.gz?unpack=false";
     };
     rpi-firmware-nonfree-src = {
       flake = false;
