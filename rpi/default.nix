@@ -51,6 +51,20 @@ in
           '';
         };
       };
+      uefi = {
+        enable = mkOption {
+          default = false;
+          type = types.bool;
+          description = ''
+            UEFI
+          '';
+        };
+        variant = mkOption {
+          type = types.enum [ 4 5 ];
+          description = lib.mdDoc "";
+        };
+      };
+
       firmwarePartitionID = mkOption {
         type = types.str;
         default = "0x2178694e";
@@ -73,6 +87,7 @@ in
   config = {
     boot.kernelParams =
       if cfg.uboot.enable then [ ]
+      else if cfg.uefi.enable then [ ]
       else if cfg.rpi-bootloader.enable then [
         # This is ugly and fragile, but the sdImage image has an msdos
         # table, so the partition table id is a 1-indexed hex
@@ -251,6 +266,7 @@ in
             enable = true;
             value = if cfg.uboot.enable then "u-boot-rpi-arm64.bin"
                     else if cfg.rpi-bootloader.enable then "kernel.img"
+                    else if cfg.uefi.enable then (builtins.throw "uefi not yet supported")
                     else (builtins.throw "invalid bootloader option");
           };
           arm_64bit = {

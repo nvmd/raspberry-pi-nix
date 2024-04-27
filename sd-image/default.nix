@@ -22,6 +22,19 @@
           '';
         };
 
+        uefi = {
+          "4" = (pkgs.fetchzip {
+                  url = "https://github.com/pftf/RPi4/releases/download/v1.36/RPi4_UEFI_Firmware_v1.36.zip";
+                  hash = "sha256-XWwutTPp7znO5w1XDEUikBNsRK74h0llxnIWIwaxhZc=";
+                  stripRoot = false;
+                });
+          "5" = (pkgs.fetchzip {
+                  url = "https://github.com/worproject/rpi5-uefi/releases/download/v0.3/RPi5_UEFI_Release_v0.3.zip";
+                  hash = "sha256-bjEvq7KlEFANnFVL0LyexXEeoXj7rHGnwQpq09PhIb0=";
+                  stripRoot = false;
+                });
+        }.${toString cfg.uefi.variant};
+
         populate-uboot = ''
           cp ${pkgs.uboot_rpi_arm64}/u-boot.bin firmware/u-boot-rpi-arm64.bin
         '';
@@ -29,10 +42,17 @@
           cp "${pkgs.rpi-kernels.latest.kernel}/Image" firmware/kernel.img
           cp "${kernel-params}" firmware/cmdline.txt
         '';
+        populate-uefi = ''
+          # uefi packages also contain some .dtb file, we get it from
+          # `pkgs.raspberrypifw` instead
+          cp ${uefi}/RPI_EFI.fd firmware
+          ${config.system.build.installBootLoader} ${config.system.build.toplevel} -d firmware
+        '';
 
         populate-bootloader =
           if cfg.uboot.enable then populate-uboot
           else if cfg.rpi-bootloader.enable then populate-kernel
+          else if cfg.uefi.enable then populate-uefi
           else (builtins.throw "invalid bootloader option");
       in
       {
@@ -55,6 +75,7 @@
             echo "$content" > ./files/sbin/init
             chmod 744 ./files/sbin/init
           ''
+          else if cfg.uefi.enable then ''''
           else (builtins.throw "invalid bootloader option");
       };
   };
