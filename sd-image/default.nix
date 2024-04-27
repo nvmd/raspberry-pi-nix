@@ -15,6 +15,7 @@
       let
         cfg = config.raspberry-pi-nix;
 
+        kernel = config.boot.kernelPackages.kernel;
         kernel-params = pkgs.writeTextFile {
           name = "cmdline.txt";
           text = ''
@@ -39,7 +40,7 @@
           cp ${pkgs.uboot_rpi_arm64}/u-boot.bin firmware/u-boot-rpi-arm64.bin
         '';
         populate-kernel = ''
-          cp "${pkgs.rpi-kernels.latest.kernel}/Image" firmware/kernel.img
+          cp "${kernel}/Image" firmware/kernel.img
           cp "${kernel-params}" firmware/cmdline.txt
         '';
         populate-uefi = ''

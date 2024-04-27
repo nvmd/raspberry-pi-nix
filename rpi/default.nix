@@ -108,6 +108,7 @@ in
           serviceConfig =
             let
               firmware-path = "/boot/firmware";
+              kernel = config.boot.kernelPackages.kernel;
               kernel-params = pkgs.writeTextFile {
                 name = "cmdline.txt";
                 text = ''
@@ -127,7 +128,7 @@ in
                 TARGET_OVERLAYS_DIR="$TARGET_FIRMWARE_DIR/overlays"
                 TMPFILE="$TARGET_FIRMWARE_DIR/tmp"
                 UBOOT="${pkgs.uboot_rpi_arm64}/u-boot.bin"
-                KERNEL="${pkgs.rpi-kernels.latest.kernel}/Image"
+                KERNEL="${kernel}/Image"
                 SHOULD_UBOOT=${if cfg.uboot.enable then "1" else "0"}
                 SHOULD_RPI_BOOT=${if cfg.rpi-bootloader.enable then "1" else "0"}
                 SRC_FIRMWARE_DIR="${pkgs.raspberrypifw}/share/raspberrypi/boot"
@@ -156,7 +157,7 @@ in
                   cp "$KERNEL" "$TMPFILE"
                   mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/kernel.img"
                   echo "${
-                    builtins.toString pkgs.rpi-kernels.latest.kernel
+                    builtins.toString kernel
                   }" > "$STATE_DIRECTORY/kernel-version"
                   rm "$STATE_DIRECTORY/kernel-migration-in-progress"
                 }
@@ -212,7 +213,7 @@ in
                 fi
 
                 if [[ "$SHOULD_RPI_BOOT" -eq 1 ]] && [[ ! -f "$STATE_DIRECTORY/kernel-version" || $(< "$STATE_DIRECTORY/kernel-version") != ${
-                  builtins.toString pkgs.rpi-kernels.latest.kernel
+                  builtins.toString kernel
                 } ]]; then
                   migrate_kernel
                 fi
@@ -316,7 +317,7 @@ in
         "pcie_brcmstb" # required for the pcie bus to work
         "reset-raspberrypi" # required for vl805 firmware to load
       ];
-      kernelPackages = pkgs.linuxPackagesFor (pkgs.rpi-kernels.latest.kernel);
+      kernelPackages = lib.mkDefault (pkgs.linuxPackagesFor (pkgs.rpi-kernels.latest.kernel));
 
       loader = {
         grub.enable = lib.mkDefault false;
