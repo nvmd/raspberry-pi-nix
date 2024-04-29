@@ -138,6 +138,7 @@ in
             let
               firmware-path = "/boot/firmware";
               uefi = cfg.uefi.package;
+              uboot = pkgs.uboot_rpi_arm64;
               kernel = config.boot.kernelPackages.kernel;
               kernel-params = pkgs.writeTextFile {
                 name = "cmdline.txt";
@@ -158,6 +159,7 @@ in
                 TARGET_OVERLAYS_DIR="$TARGET_FIRMWARE_DIR/overlays"
                 TMPFILE="$TARGET_FIRMWARE_DIR/tmp"
                 UEFI="${uefi}/RPI_EFI.fd"
+                UBOOT="${uboot}/u-boot.bin"
                 KERNEL="${kernel}/Image"
                 SHOULD_UEFI=${if cfg.uefi.enable then "1" else "0"}
                 SHOULD_UBOOT=${if cfg.uboot.enable then "1" else "0"}
@@ -188,7 +190,7 @@ in
                   cp "$UBOOT" "$TMPFILE"
                   mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/u-boot-rpi-arm64.bin"
                   echo "${
-                    builtins.toString pkgs.uboot_rpi_arm64
+                    builtins.toString uboot
                   }" > "$STATE_DIRECTORY/uboot-version"
                   rm "$STATE_DIRECTORY/uboot-migration-in-progress"
                 }
@@ -255,7 +257,7 @@ in
                 fi
 
                 if [[ "$SHOULD_UBOOT" -eq 1 ]] && [[ -f "$STATE_DIRECTORY/uboot-migration-in-progress" || ! -f "$STATE_DIRECTORY/uboot-version" || $(< "$STATE_DIRECTORY/uboot-version") != ${
-                  builtins.toString pkgs.uboot_rpi_arm64
+                  builtins.toString uboot
                 } ]]; then
                   migrate_uboot
                 fi

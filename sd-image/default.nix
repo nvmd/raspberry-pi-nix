@@ -24,9 +24,10 @@
         };
 
         uefi = cfg.uefi.package;
+        uboot = pkgs.uboot_rpi_arm64;
 
         populate-uboot = ''
-          cp ${pkgs.uboot_rpi_arm64}/u-boot.bin firmware/u-boot-rpi-arm64.bin
+          cp ${uboot}/u-boot.bin firmware/u-boot-rpi-arm64.bin
         '';
         populate-kernel = ''
           cp "${kernel}/Image" firmware/kernel.img
