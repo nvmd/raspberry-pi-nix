@@ -59,6 +59,24 @@ in
             UEFI
           '';
         };
+        package = mkOption {
+          default = {
+            "4" = (pkgs.fetchzip {
+                    url = "https://github.com/pftf/RPi4/releases/download/v1.36/RPi4_UEFI_Firmware_v1.36.zip";
+                    hash = "sha256-XWwutTPp7znO5w1XDEUikBNsRK74h0llxnIWIwaxhZc=";
+                    stripRoot = false;
+                  });
+            "5" = (pkgs.fetchzip {
+                    url = "https://github.com/worproject/rpi5-uefi/releases/download/v0.3/RPi5_UEFI_Release_v0.3.zip";
+                    hash = "sha256-bjEvq7KlEFANnFVL0LyexXEeoXj7rHGnwQpq09PhIb0=";
+                    stripRoot = false;
+                  });
+          }.${toString cfg.uefi.variant};
+          type = types.package;
+          description = ''
+            UEFI package
+          '';
+        };
         variant = mkOption {
           type = types.enum [ 4 5 ];
           description = lib.mdDoc "";
@@ -108,6 +126,7 @@ in
           serviceConfig =
             let
               firmware-path = "/boot/firmware";
+              uefi = cfg.uefi.package;
               kernel = config.boot.kernelPackages.kernel;
               kernel-params = pkgs.writeTextFile {
                 name = "cmdline.txt";
@@ -127,8 +146,9 @@ in
                 TARGET_FIRMWARE_DIR="${firmware-path}"
                 TARGET_OVERLAYS_DIR="$TARGET_FIRMWARE_DIR/overlays"
                 TMPFILE="$TARGET_FIRMWARE_DIR/tmp"
-                UBOOT="${pkgs.uboot_rpi_arm64}/u-boot.bin"
+                UEFI="${uefi}/RPI_EFI.fd"
                 KERNEL="${kernel}/Image"
+                SHOULD_UEFI=${if cfg.uefi.enable then "1" else "0"}
                 SHOULD_UBOOT=${if cfg.uboot.enable then "1" else "0"}
                 SHOULD_RPI_BOOT=${if cfg.rpi-bootloader.enable then "1" else "0"}
                 SRC_FIRMWARE_DIR="${pkgs.raspberrypifw}/share/raspberrypi/boot"
@@ -139,6 +159,17 @@ in
                 SRC_OVERLAYS_DIR="$SRC_FIRMWARE_DIR/overlays"
                 SRC_OVERLAYS=("$SRC_OVERLAYS_DIR"/*)
                 CONFIG="${config.hardware.raspberry-pi.config-output}"
+
+                migrate_uefi() {
+                  echo "migrating uefi"
+                  touch "$STATE_DIRECTORY/uefi-migration-in-progress"
+                  cp "$UEFI" "$TMPFILE"
+                  mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/RPI_EFI.fd"
+                  echo "${
+                    builtins.toString uefi
+                  }" > "$STATE_DIRECTORY/uefi-version"
+                  rm "$STATE_DIRECTORY/uefi-migration-in-progress"
+                }
 
                 migrate_uboot() {
                   echo "migrating uboot"
@@ -205,6 +236,12 @@ in
                   }" > "$STATE_DIRECTORY/firmware-version"
                   rm "$STATE_DIRECTORY/firmware-migration-in-progress"
                 }
+
+                if [[ "$SHOULD_UEFI" -eq 1 ]] && [[ -f "$STATE_DIRECTORY/uefi-migration-in-progress" || ! -f "$STATE_DIRECTORY/uefi-version" || $(< "$STATE_DIRECTORY/uefi-version") != ${
+                  builtins.toString uefi
+                } ]]; then
+                  migrate_uefi
+                fi
 
                 if [[ "$SHOULD_UBOOT" -eq 1 ]] && [[ -f "$STATE_DIRECTORY/uboot-migration-in-progress" || ! -f "$STATE_DIRECTORY/uboot-version" || $(< "$STATE_DIRECTORY/uboot-version") != ${
                   builtins.toString pkgs.uboot_rpi_arm64

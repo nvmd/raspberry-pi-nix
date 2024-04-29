@@ -23,18 +23,7 @@
           '';
         };
 
-        uefi = {
-          "4" = (pkgs.fetchzip {
-                  url = "https://github.com/pftf/RPi4/releases/download/v1.36/RPi4_UEFI_Firmware_v1.36.zip";
-                  hash = "sha256-XWwutTPp7znO5w1XDEUikBNsRK74h0llxnIWIwaxhZc=";
-                  stripRoot = false;
-                });
-          "5" = (pkgs.fetchzip {
-                  url = "https://github.com/worproject/rpi5-uefi/releases/download/v0.3/RPi5_UEFI_Release_v0.3.zip";
-                  hash = "sha256-bjEvq7KlEFANnFVL0LyexXEeoXj7rHGnwQpq09PhIb0=";
-                  stripRoot = false;
-                });
-        }.${toString cfg.uefi.variant};
+        uefi = cfg.uefi.package;
 
         populate-uboot = ''
           cp ${pkgs.uboot_rpi_arm64}/u-boot.bin firmware/u-boot-rpi-arm64.bin
