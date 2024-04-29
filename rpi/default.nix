@@ -146,6 +146,7 @@ in
                   ${lib.strings.concatStringsSep " " config.boot.kernelParams}
                 '';
               };
+              configTxt = config.hardware.raspberry-pi.config-output;
             in
             {
               Type = "oneshot";
@@ -171,7 +172,7 @@ in
                 FIXUPS=("$SRC_FIRMWARE_DIR"/fixup*.dat)
                 SRC_OVERLAYS_DIR="$SRC_FIRMWARE_DIR/overlays"
                 SRC_OVERLAYS=("$SRC_OVERLAYS_DIR"/*)
-                CONFIG="${config.hardware.raspberry-pi.config-output}"
+                CONFIG="${configTxt}"
 
                 migrate_uefi() {
                   echo "migrating uefi"
@@ -222,7 +223,7 @@ in
                   touch "$STATE_DIRECTORY/config-migration-in-progress"
                   cp "$CONFIG" "$TMPFILE"
                   mv -T "$TMPFILE" "$TARGET_FIRMWARE_DIR/config.txt"
-                  echo "${config.hardware.raspberry-pi.config-output}" > "$STATE_DIRECTORY/config-version"
+                  echo "${configTxt}" > "$STATE_DIRECTORY/config-version"
                   rm "$STATE_DIRECTORY/config-migration-in-progress"
                 }
 
@@ -275,7 +276,7 @@ in
                 fi
 
                 if [[ -f "$STATE_DIRECTORY/config-migration-in-progress" || ! -f "$STATE_DIRECTORY/config-version" || $(< "$STATE_DIRECTORY/config-version") != ${
-                  builtins.toString config.hardware.raspberry-pi.config-output
+                  builtins.toString configTxt
                 } ]]; then
                   migrate_config
                 fi
