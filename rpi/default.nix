@@ -48,7 +48,7 @@ in
       bootloader = mkOption {
         default = "uboot";
         type = types.enum [ "rpi" "uboot" "uefi" ];
-        description = lib.mdDoc ''
+        description = ''
           Bootloader to use:
           - `"uefi"`: EDK2 UEFI firmware. See also `uefi.package`.
           - `"uboot"`: U-Boot
@@ -79,7 +79,7 @@ in
                   });
           }.${toString cfg.rpi-variant};
           type = types.package;
-          description = lib.mdDoc ''
+          description = ''
             UEFI firmware to use, depending on `rpi-variant` option value:
             - "4" for https://github.com/pftf/RPi4/
             - "5" for https://github.com/worproject/rpi5-uefi/.
