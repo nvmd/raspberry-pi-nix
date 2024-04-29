@@ -8,6 +8,13 @@ in
 
   options = with lib; {
     raspberry-pi-nix = {
+      rpi-variant = mkOption {
+        default = 4;
+        type = types.enum [ 4 5 ];
+        description = ''
+          Target RaspberryPi device variant: 4 or 5.
+        '';
+      };
       firmware-migration-service = {
         enable = mkOption {
           default = true;
@@ -38,38 +45,26 @@ in
           '';
         };
       };
-      rpi-bootloader = {
-        enable = mkOption {
-          default = false;
-          type = types.bool;
-          description = ''
-            The linux kernel is installed directly into the
+      bootloader = mkOption {
+        default = "uboot";
+        type = types.enum [ "rpi" "uboot" "uefi" ];
+        description = lib.mdDoc ''
+          Bootloader to use:
+          - `"uefi"`: EDK2 UEFI firmware. See also `uefi.package`.
+          - `"uboot"`: U-Boot
+          - `"rpi"`: The linux kernel is installed directly into the
             firmware directory as expected by the raspberry pi boot
             process.
 
             This can be useful for newer hardware that doesn't yet have
             uboot compatibility or less common setups, like booting a
             cm4 with an nvme drive.
-          '';
-        };
+        '';
       };
       uboot = {
-        enable = mkOption {
-          default = true;
-          type = types.bool;
-          description = ''
-            If enabled then uboot is used as the bootloader.
-          '';
-        };
+        package = mkPackageOption pkgs "uboot_rpi_arm64" { };
       };
       uefi = {
-        enable = mkOption {
-          default = false;
-          type = types.bool;
-          description = ''
-            UEFI
-          '';
-        };
         package = mkOption {
           default = {
             "4" = (pkgs.fetchzip {
@@ -82,15 +77,14 @@ in
                     hash = "sha256-bjEvq7KlEFANnFVL0LyexXEeoXj7rHGnwQpq09PhIb0=";
                     stripRoot = false;
                   });
-          }.${toString cfg.uefi.variant};
+          }.${toString cfg.rpi-variant};
           type = types.package;
-          description = ''
-            UEFI package
+          description = lib.mdDoc ''
+            UEFI firmware to use, depending on `rpi-variant` option value:
+            - "4" for https://github.com/pftf/RPi4/
+            - "5" for https://github.com/worproject/rpi5-uefi/.
+            Alternatively, package can be specified directly with `uefi.package`.
           '';
-        };
-        variant = mkOption {
-          type = types.enum [ 4 5 ];
-          description = lib.mdDoc "";
         };
       };
 
@@ -113,11 +107,15 @@ in
     };
   };
 
-  config = {
-    boot.kernelParams =
-      if cfg.uboot.enable then [ ]
-      else if cfg.uefi.enable then [ ]
-      else if cfg.rpi-bootloader.enable then [
+  config = let
+    isBootloaderUefi = cfg.bootloader == "uefi";
+    isBootloaderUboot = cfg.bootloader == "uboot";
+    isBootloaderRpi = cfg.bootloader == "rpi";
+  in {
+    boot.kernelParams = {
+      uefi = [];
+      uboot = [];
+      rpi = [
         # This is ugly and fragile, but the sdImage image has an msdos
         # table, so the partition table id is a 1-indexed hex
         # number. So, we drop the hex prefix and stick on a "02" to
@@ -127,8 +125,8 @@ in
         "fsck.repair=yes"
         "rootwait"
         "init=/sbin/init"
-      ]
-      else (builtins.throw "invalid bootloader option");
+      ];
+    }.${cfg.bootloader};
     systemd.services = {
       "raspberry-pi-firmware-migrate" =
         {
@@ -138,7 +136,7 @@ in
             let
               firmware-path = "/boot/firmware";
               uefi = cfg.uefi.package;
-              uboot = pkgs.uboot_rpi_arm64;
+              uboot = cfg.uboot.package;
               kernel = config.boot.kernelPackages.kernel;
               kernel-params = pkgs.writeTextFile {
                 name = "cmdline.txt";
@@ -162,9 +160,9 @@ in
                 UEFI="${uefi}/RPI_EFI.fd"
                 UBOOT="${uboot}/u-boot.bin"
                 KERNEL="${kernel}/Image"
-                SHOULD_UEFI=${if cfg.uefi.enable then "1" else "0"}
-                SHOULD_UBOOT=${if cfg.uboot.enable then "1" else "0"}
-                SHOULD_RPI_BOOT=${if cfg.rpi-bootloader.enable then "1" else "0"}
+                SHOULD_UEFI=${if isBootloaderUefi then "1" else "0"}
+                SHOULD_UBOOT=${if isBootloaderUboot then "1" else "0"}
+                SHOULD_RPI_BOOT=${if isBootloaderRpi then "1" else "0"}
                 SRC_FIRMWARE_DIR="${pkgs.raspberrypifw}/share/raspberrypi/boot"
                 STARTFILES=("$SRC_FIRMWARE_DIR"/start*.elf)
                 DTBS=("$SRC_FIRMWARE_DIR"/*.dtb)
@@ -314,41 +312,43 @@ in
         options = {
           # The firmware will start our u-boot binary rather than a
           # linux kernel.
-          kernel = lib.mkIf (cfg.uboot.enable || cfg.rpi-bootloader.enable) {
+          kernel = lib.mkIf (isBootloaderUboot || isBootloaderRpi) {
             enable = true;
-            value = if cfg.uboot.enable then "u-boot-rpi-arm64.bin"
-                    else if cfg.rpi-bootloader.enable then "kernel.img"
-                    else (builtins.throw "invalid bootloader option for `kernel`");
+            value = {
+              uboot = "u-boot-rpi-arm64.bin";
+              rpi = "kernel.img";
+            }.${cfg.bootloader};
           };
           armstub = {
-            enable = lib.mkDefault cfg.uefi.enable;
+            enable = lib.mkDefault isBootloaderUefi;
             value = "RPI_EFI.fd";
           };
           device_tree_address = {
-            enable = lib.mkDefault cfg.uefi.enable;
+            enable = lib.mkDefault isBootloaderUefi;
             value = lib.mkDefault "0x1f0000";
           };
           device_tree_end = {
-            enable = lib.mkDefault cfg.uefi.enable;
-            value = lib.mkDefault (if cfg.uefi.variant == 4 then "0x200000"
-                                   else if cfg.uefi.variant == 5 then "0x210000"
-                                   else (builtins.throw "unsupported uefi variant"));
+            enable = lib.mkDefault isBootloaderUefi;
+            value = lib.mkDefault ({
+              "4" = "0x200000";
+              "5" = "0x210000";
+            }.${toString cfg.rpi-variant});
           };
           framebuffer_depth = {
             # Force 32 bpp framebuffer allocation.
-            enable = lib.mkDefault (cfg.uefi.enable && cfg.uefi.variant == 5);
+            enable = lib.mkDefault (isBootloaderUefi && cfg.rpi-variant == 5);
             value = 32;
           };
           disable_commandline_tags = {
-            enable = lib.mkDefault (cfg.uefi.enable && cfg.uefi.variant == 4);
+            enable = lib.mkDefault (isBootloaderUefi && cfg.rpi-variant == 4);
             value = 1;
           };
           uart_2ndstage = {
-            enable = lib.mkDefault (cfg.uefi.enable && cfg.uefi.variant == 4);
+            enable = lib.mkDefault (isBootloaderUefi && cfg.rpi-variant == 4);
             value = 1;
           };
           enable_gic = {
-            enable = lib.mkDefault (cfg.uefi.enable && cfg.uefi.variant == 4);
+            enable = lib.mkDefault (isBootloaderUefi && cfg.rpi-variant == 4);
             value = 1;
           };
           arm_64bit = {
@@ -382,11 +382,11 @@ in
             params = { };
           };
           miniuart-bt = {
-            enable = lib.mkDefault (cfg.uefi.enable && cfg.uefi.variant == 4);
+            enable = lib.mkDefault (isBootloaderUefi && cfg.rpi-variant == 4);
             params = { };
           };
           upstream-pi4 = {
-            enable = lib.mkDefault (cfg.uefi.enable && cfg.uefi.variant == 4);
+            enable = lib.mkDefault (isBootloaderUefi && cfg.rpi-variant == 4);
             params = { };
           };
         };
@@ -409,19 +409,19 @@ in
 
       loader = {
         grub.enable = lib.mkDefault false;
-        initScript.enable = cfg.rpi-bootloader.enable;
+        initScript.enable = isBootloaderRpi;
         generic-extlinux-compatible = {
-          enable = lib.mkDefault cfg.uboot.enable;
+          enable = lib.mkDefault isBootloaderUboot;
           # We want to use the device tree provided by firmware, so don't
           # add FDTDIR to the extlinux conf file.
           useGenerationDeviceTree = false;
         };
 
-        efi = lib.mkIf cfg.uefi.enable {
+        efi = lib.mkIf isBootloaderUefi {
           canTouchEfiVariables = lib.mkDefault false;
         };
         systemd-boot = {
-          enable = lib.mkDefault cfg.uefi.enable;
+          enable = lib.mkDefault isBootloaderUefi;
         };
       };
     };

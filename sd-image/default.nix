@@ -24,7 +24,7 @@
         };
 
         uefi = cfg.uefi.package;
-        uboot = pkgs.uboot_rpi_arm64;
+        uboot = cfg.uboot.package;
 
         populate-uboot = ''
           cp ${uboot}/u-boot.bin firmware/u-boot-rpi-arm64.bin
@@ -40,11 +40,11 @@
           ${config.system.build.installBootLoader} ${config.system.build.toplevel} -d firmware
         '';
 
-        populate-bootloader =
-          if cfg.uboot.enable then populate-uboot
-          else if cfg.rpi-bootloader.enable then populate-kernel
-          else if cfg.uefi.enable then populate-uefi
-          else (builtins.throw "invalid bootloader option");
+        populate-bootloader = {
+          uefi = populate-uefi;
+          uboot = populate-uboot;
+          rpi = populate-kernel;
+        }.${cfg.bootloader};
       in
       {
         populateFirmwareCommands = ''
@@ -52,12 +52,13 @@
           cp -r ${pkgs.raspberrypifw}/share/raspberrypi/boot/{start*.elf,*.dtb,bootcode.bin,fixup*.dat,overlays} firmware
           cp ${config.hardware.raspberry-pi.config-output} firmware/config.txt
         '';
-        populateRootCommands =
-          if cfg.uboot.enable then ''
+        populateRootCommands = {
+          uefi = '''';
+          uboot = ''
             mkdir -p ./files/boot
             ${config.boot.loader.generic-extlinux-compatible.populateCmd} -c ${config.system.build.toplevel} -d ./files/boot
-          ''
-          else if cfg.rpi-bootloader.enable then ''
+          '';
+          rpi = ''
             mkdir -p ./files/sbin
             content="$(
               echo "#!${pkgs.bash}/bin/bash"
@@ -65,9 +66,8 @@
             )"
             echo "$content" > ./files/sbin/init
             chmod 744 ./files/sbin/init
-          ''
-          else if cfg.uefi.enable then ''''
-          else (builtins.throw "invalid bootloader option");
+          '';
+        }.${cfg.bootloader};
       };
   };
 }
