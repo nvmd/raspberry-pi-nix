@@ -418,7 +418,11 @@ in
       kernelPackages = lib.mkDefault (pkgs.linuxPackagesFor (pkgs.rpi-kernels.latest.kernel));
 
       loader = {
-        grub.enable = lib.mkDefault false;
+        grub = {
+          enable = lib.mkDefault (isBootloaderUefi && !config.boot.loader.systemd-boot.enable);
+          device = "nodev";
+          efiSupport = true;
+        };
         initScript.enable = isBootloaderRpi;
         generic-extlinux-compatible = {
           enable = lib.mkDefault isBootloaderUboot;
@@ -430,9 +434,9 @@ in
         efi = lib.mkIf isBootloaderUefi {
           canTouchEfiVariables = lib.mkDefault false;
         };
-        systemd-boot = {
-          enable = lib.mkDefault isBootloaderUefi;
-        };
+        # systemd-boot = {
+        #   enable = lib.mkDefault isBootloaderUefi;
+        # };
       };
     };
     hardware.enableRedistributableFirmware = true;
