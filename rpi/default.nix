@@ -61,6 +61,20 @@ in
             cm4 with an nvme drive.
         '';
       };
+      rpi-boot = {
+        rootPartition = mkOption {
+          type = types.str;
+          # This is ugly and fragile, but the sdImage image has an msdos
+          # table, so the partition table id is a 1-indexed hex
+          # number. So, we drop the hex prefix and stick on a "02" to
+          # refer to the root partition.
+          default = "PARTUUID=${lib.strings.removePrefix "0x" cfg.firmwarePartitionID}-02";
+          description = ''
+            Root partition parameter for Linux kernel to be used for
+            RaspberryPi boot process.
+          '';
+        };
+      };
       uboot = {
         package = mkPackageOption pkgs "uboot_rpi_arm64" { };
       };
@@ -116,11 +130,7 @@ in
       uefi = [];
       uboot = [];
       rpi = [
-        # This is ugly and fragile, but the sdImage image has an msdos
-        # table, so the partition table id is a 1-indexed hex
-        # number. So, we drop the hex prefix and stick on a "02" to
-        # refer to the root partition.
-        "root=PARTUUID=${lib.strings.removePrefix "0x" config.raspberry-pi-nix.firmwarePartitionID}-02"
+        "root=${cfg.rpi-boot.rootPartition}"
         "rootfstype=ext4"
         "fsck.repair=yes"
         "rootwait"
