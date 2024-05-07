@@ -54,6 +54,7 @@
         uboot = import ./rpi/config-uboot.nix;
         uefi = import ./rpi/config-uefi.nix;
       };
+      udev = import ./rpi/udev.nix;
     };
   };
 }
