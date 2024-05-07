@@ -125,7 +125,9 @@ in
     isBootloaderUefi = cfg.bootloader == "uefi";
     isBootloaderUboot = cfg.bootloader == "uboot";
     isBootloaderRpi = cfg.bootloader == "rpi";
-  in {
+  in lib.mkMerge [ 
+    {
+
     boot.kernelParams = {
       uefi = [];
       uboot = [];
@@ -403,6 +405,110 @@ in
       };
     };
 
+    # Default config.txt on Raspberry Pi OS:
+    # https://github.com/RPi-Distro/pi-gen/blob/master/stage1/00-boot-files/files/config.txt
+    hardware.raspberry-pi.config = {
+      cm4 = {
+        options = {
+          otg_mode = {
+            enable = lib.mkDefault true;
+            value = lib.mkDefault true;
+          };
+        };
+      };
+      pi4 = {
+        options = {
+          arm_boost = {
+            enable = lib.mkDefault true;
+            value = lib.mkDefault true;
+          };
+        };
+      };
+      all = {
+        options = {
+          # The firmware will start our u-boot binary rather than a
+          # linux kernel.
+          kernel = lib.mkIf (isBootloaderUboot || isBootloaderRpi) {
+            enable = true;
+            value = {
+              uboot = "u-boot-rpi-arm64.bin";
+              rpi = "kernel.img";
+            }.${cfg.bootloader};
+          };
+          armstub = {
+            enable = lib.mkDefault isBootloaderUefi;
+            value = "RPI_EFI.fd";
+          };
+          device_tree_address = {
+            enable = lib.mkDefault isBootloaderUefi;
+            value = lib.mkDefault "0x1f0000";
+          };
+          device_tree_end = {
+            enable = lib.mkDefault isBootloaderUefi;
+            value = lib.mkDefault ({
+              "4" = "0x200000";
+              "5" = "0x210000";
+            }.${toString cfg.rpi-variant});
+          };
+          framebuffer_depth = {
+            # Force 32 bpp framebuffer allocation.
+            enable = lib.mkDefault (isBootloaderUefi && cfg.rpi-variant == 5);
+            value = 32;
+          };
+          disable_commandline_tags = {
+            enable = lib.mkDefault (isBootloaderUefi && cfg.rpi-variant == 4);
+            value = 1;
+          };
+          uart_2ndstage = {
+            enable = lib.mkDefault (isBootloaderUefi && cfg.rpi-variant == 4);
+            value = 1;
+          };
+          enable_gic = {
+            enable = lib.mkDefault (isBootloaderUefi && cfg.rpi-variant == 4);
+            value = 1;
+          };
+          arm_64bit = {
+            enable = true;
+            value = true;
+          };
+          enable_uart = {
+            enable = true;
+            value = true;
+          };
+          avoid_warnings = {
+            enable = lib.mkDefault true;
+            value = lib.mkDefault true;
+          };
+          camera_auto_detect = {
+            enable = lib.mkDefault true;
+            value = lib.mkDefault true;
+          };
+          display_auto_detect = {
+            enable = lib.mkDefault true;
+            value = lib.mkDefault true;
+          };
+          disable_overscan = {
+            enable = lib.mkDefault true;
+            value = lib.mkDefault true;
+          };
+        };
+        dt-overlays = {
+          vc4-kms-v3d = {
+            enable = lib.mkDefault true;
+            params = { };
+          };
+          miniuart-bt = {
+            enable = lib.mkDefault (isBootloaderUefi && cfg.rpi-variant == 4);
+            params = { };
+          };
+          upstream-pi4 = {
+            enable = lib.mkDefault (isBootloaderUefi && cfg.rpi-variant == 4);
+            params = { };
+          };
+        };
+      };
+    };
+
     nixpkgs = {
       overlays = lib.optionals cfg.core-overlay.enable [ core-overlay ]
               ++ lib.optionals cfg.libcamera-overlay.enable [ libcamera-overlay ];
@@ -488,7 +594,8 @@ in
           	fi; \
           '"
         '';
-    };
-  };
+      };
+    }
+  ];
 
 }
