@@ -45,7 +45,8 @@ let
     in
     conf:
     lib.strings.concatStringsSep "\n"
-      (lib.attrsets.mapAttrsToList render-config-section conf);
+      ((lib.attrsets.mapAttrsToList render-config-section conf)
+      ++ [ cfg.extra-config ]);
 in
 {
   options = {
@@ -119,6 +120,15 @@ in
         lib.mkOption {
           type = with lib.types; attrsOf (submodule raspberry-pi-config-options);
         };
+
+      extra-config = lib.mkOption {
+        default = "";
+        type = lib.types.lines;
+        description = ''
+          Extra options that will be appended to `/boot/config.txt` file.
+          For possible values, see: https://www.raspberrypi.com/documentation/computers/config_txt.html
+        '';
+      };
 
       config-generated = lib.mkOption {
         type = lib.types.str;
