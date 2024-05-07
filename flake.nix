@@ -41,9 +41,19 @@
       core = import ./overlays (builtins.removeAttrs srcs [ "self" ]);
       libcamera = import ./overlays/libcamera.nix (builtins.removeAttrs srcs [ "self" ]);
     };
-    nixosModules.raspberry-pi = import ./rpi {
-      core-overlay = self.overlays.core;
-      libcamera-overlay = self.overlays.libcamera;
+    nixosModules = {
+      raspberry-pi = import ./rpi {
+        core-overlay = self.overlays.core;
+        libcamera-overlay = self.overlays.libcamera;
+      };
+      config-txt = {
+        generator = import ./rpi/config.nix;
+
+        default = import ./rpi/config-default.nix;
+        rpiboot = import ./rpi/config-rpiboot.nix;
+        uboot = import ./rpi/config-uboot.nix;
+        uefi = import ./rpi/config-uefi.nix;
+      };
     };
   };
 }
